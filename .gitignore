@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+*.o
+*.log
+*.pid
+.venv/
+venv/
+theta_z1_uvc_stdout
+!/bin/theta_z1_uvc_stdout
