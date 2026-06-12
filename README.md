@@ -10,6 +10,7 @@ The Edge2 sender reads the THETA Z1 H.264 UVC stream through `libuvc-theta`, pac
 edge2_theta_z1_webrtc_sender.py      Edge2 WebRTC sender
 edge2_run_theta_z1_webrtc_sender.sh  Edge2 launcher
 edge2_probe_theta_z1.sh              Edge2 camera/GStreamer probe helper
+edge2_unity_command_receiver.py      Edge2 UDP receiver for Unity AdaptiveFly drone commands
 edge2_mavlink_to_z1att.py            Optional MAVLink ATTITUDE to Z1 IMU side-channel helper
 theta_z1_uvc_stdout.c                THETA Z1 H.264 stdout bridge
 thetauvc.c / thetauvc.h              THETA UVC helper code
@@ -228,6 +229,77 @@ ICE state: Connected
 Peer state: Connected
 First frame: 1920x960, texture=Texture2D
 ```
+
+## Unity Drone Command Receiver
+
+`edge2_unity_command_receiver.py` listens for AdaptiveFly Unity UDP JSON commands and emits sanitized body-frame velocity setpoints. It is intentionally conservative by default: it requires `valid=true`, clamps again on the Edge2, and outputs hover if no packet arrives within 300 ms.
+
+Default receiver settings:
+
+```text
+listen: 0.0.0.0:14560
+timeout: 300 ms
+max forward/right: +/-0.3 m/s
+max up/down: +/-0.2 m/s
+max yaw: +/-30 deg/s
+frame: body_frd
+```
+
+Start it on the Edge2:
+
+```bash
+cd ~/WebRTC_Z1
+python3 edge2_unity_command_receiver.py
+```
+
+For JSON output that another bridge can consume:
+
+```bash
+python3 edge2_unity_command_receiver.py --print-json
+```
+
+To forward sanitized JSON to another local bridge:
+
+```bash
+python3 edge2_unity_command_receiver.py --forward-udp 127.0.0.1:14600
+```
+
+Unity must send to the Edge2 IP, not `127.0.0.1`. In `AdaptiveFlyDroneCommandBroadcaster` set:
+
+```text
+destinationHost = <EDGE2_IP>
+destinationPort = 14560
+```
+
+For the current test network the Edge2 IP was:
+
+```text
+192.168.68.57
+```
+
+The receiver uses these Unity fields:
+
+```text
+valid
+has_body_anchor
+using_hmd_fallback
+forward_mps
+right_mps
+down_mps
+up_mps
+yaw_deg_s
+```
+
+The sanitized output keeps FRD body-frame semantics:
+
+```text
+forward_mps  positive forward
+right_mps    positive right
+down_mps     positive down
+yaw_deg_s    yaw-rate command in degrees/second
+```
+
+This script does not arm a vehicle or bypass flight-controller safety. A real MAVLink/ROS bridge should consume the sanitized output, enforce its own deadman/mode checks, and hover on timeout.
 
 ## Optional MAVLink IMU Side-Channel
 
