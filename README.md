@@ -239,8 +239,7 @@ Default receiver settings:
 ```text
 listen: 0.0.0.0:14560
 timeout: 300 ms
-max forward/right: +/-0.3 m/s
-max up/down: +/-0.2 m/s
+max x/y/z: +/-0.5 m/s
 max yaw: +/-30 deg/s
 output frame: body_flu
 ```
@@ -274,7 +273,7 @@ destinationPort = 14560
 For the current test network the Edge2 IP was:
 
 ```text
-192.168.68.57
+192.168.88.51
 ```
 
 The receiver consumes these Unity input fields:
