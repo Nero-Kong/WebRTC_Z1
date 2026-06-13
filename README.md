@@ -232,7 +232,7 @@ First frame: 1920x960, texture=Texture2D
 
 ## Unity Drone Command Receiver
 
-`edge2_unity_command_receiver.py` listens for AdaptiveFly Unity UDP JSON commands and emits sanitized body-frame velocity setpoints. It is intentionally conservative by default: it requires `valid=true`, clamps again on the Edge2, and outputs hover if no packet arrives within 300 ms.
+`edge2_unity_command_receiver.py` listens for AdaptiveFly Unity UDP JSON commands and emits sanitized body-frame velocity setpoints. Unity input uses body FRD fields; the sanitized output is body FLU so downstream PX4/ROS code can consume `x_mps`, `y_mps`, `z_mps`, and `yaw_rad_s` directly. It is intentionally conservative by default: it requires `valid=true`, clamps again on the Edge2, and outputs hover if no packet arrives within 300 ms.
 
 Default receiver settings:
 
@@ -242,7 +242,7 @@ timeout: 300 ms
 max forward/right: +/-0.3 m/s
 max up/down: +/-0.2 m/s
 max yaw: +/-30 deg/s
-frame: body_frd
+output frame: body_flu
 ```
 
 Start it on the Edge2:
@@ -277,7 +277,7 @@ For the current test network the Edge2 IP was:
 192.168.68.57
 ```
 
-The receiver uses these Unity fields:
+The receiver consumes these Unity input fields:
 
 ```text
 valid
@@ -286,17 +286,44 @@ using_hmd_fallback
 forward_mps
 right_mps
 down_mps
-up_mps
 yaw_deg_s
 ```
 
-The sanitized output keeps FRD body-frame semantics:
+Unity input is body FRD:
 
 ```text
 forward_mps  positive forward
 right_mps    positive right
 down_mps     positive down
 yaw_deg_s    yaw-rate command in degrees/second
+```
+
+The sanitized output is body FLU:
+
+```text
+x_mps      positive forward
+y_mps      positive left
+z_mps      positive up
+yaw_deg_s  positive about +Z/up
+yaw_rad_s  positive about +Z/up
+```
+
+Conversion:
+
+```text
+x_mps = forward_mps
+y_mps = -right_mps
+z_mps = -down_mps
+yaw_deg_s = -input_yaw_deg_s
+```
+
+For PX4/ROS bridges that only need four values, read:
+
+```text
+x_mps
+y_mps
+z_mps
+yaw_rad_s
 ```
 
 This script does not arm a vehicle or bypass flight-controller safety. A real MAVLink/ROS bridge should consume the sanitized output, enforce its own deadman/mode checks, and hover on timeout.

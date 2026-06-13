@@ -14,6 +14,10 @@ def clamp(value, limit):
     return max(-limit, min(limit, value))
 
 
+def clean_zero(value):
+    return 0.0 if abs(value) < 1e-9 else value
+
+
 def number(payload, key, default=0.0):
     value = payload.get(key, default)
     try:
@@ -106,6 +110,11 @@ class UnityCommandReceiver:
         up_mps = number(payload, "up_mps", 0.0)
         down_mps = number(payload, "down_mps", -up_mps)
 
+        forward_frd = 0.0 if force_hover else clamp(number(payload, "forward_mps"), self.args.max_planar_mps)
+        right_frd = 0.0 if force_hover else clamp(number(payload, "right_mps"), self.args.max_planar_mps)
+        down_frd = 0.0 if force_hover else clamp(down_mps, self.args.max_vertical_mps)
+        yaw_frd_deg_s = 0.0 if force_hover else clamp(number(payload, "yaw_deg_s"), self.args.max_yaw_deg_s)
+
         command = {
             "type": "adaptivefly_control_sanitized",
             "source": f"{address[0]}:{address[1]}",
@@ -117,12 +126,16 @@ class UnityCommandReceiver:
             "using_hmd_fallback": bool(payload.get("using_hmd_fallback", False)),
             "state": "active" if not force_hover else "hover",
             "reason": "valid" if not force_hover else "invalid-input",
-            "frame": "body_frd",
-            "forward_mps": 0.0 if force_hover else clamp(number(payload, "forward_mps"), self.args.max_planar_mps),
-            "right_mps": 0.0 if force_hover else clamp(number(payload, "right_mps"), self.args.max_planar_mps),
-            "down_mps": 0.0 if force_hover else clamp(down_mps, self.args.max_vertical_mps),
-            "up_mps": 0.0 if force_hover else clamp(-down_mps, self.args.max_vertical_mps),
-            "yaw_deg_s": 0.0 if force_hover else clamp(number(payload, "yaw_deg_s"), self.args.max_yaw_deg_s),
+            "frame": "body_flu",
+            "x_mps": clean_zero(forward_frd),
+            "y_mps": clean_zero(-right_frd),
+            "z_mps": clean_zero(-down_frd),
+            "yaw_deg_s": clean_zero(-yaw_frd_deg_s),
+            "input_frame": "body_frd",
+            "input_forward_mps": forward_frd,
+            "input_right_mps": right_frd,
+            "input_down_mps": down_frd,
+            "input_yaw_deg_s": yaw_frd_deg_s,
         }
         command["yaw_rad_s"] = math.radians(command["yaw_deg_s"])
         command["packets_received"] = self.packet_count
@@ -165,13 +178,17 @@ class UnityCommandReceiver:
             "using_hmd_fallback": False,
             "state": "hover",
             "reason": reason,
-            "frame": "body_frd",
-            "forward_mps": 0.0,
-            "right_mps": 0.0,
-            "down_mps": 0.0,
-            "up_mps": 0.0,
+            "frame": "body_flu",
+            "x_mps": 0.0,
+            "y_mps": 0.0,
+            "z_mps": 0.0,
             "yaw_deg_s": 0.0,
             "yaw_rad_s": 0.0,
+            "input_frame": "body_frd",
+            "input_forward_mps": 0.0,
+            "input_right_mps": 0.0,
+            "input_down_mps": 0.0,
+            "input_yaw_deg_s": 0.0,
             "packets_received": self.packet_count,
             "bad_packets": self.bad_packet_count,
         }
@@ -197,8 +214,8 @@ class UnityCommandReceiver:
         self.log(
             f"state={command['state']} reason={command['reason']} "
             f"seq={command.get('input_seq')} valid={command.get('input_valid')} "
-            f"fwd={command['forward_mps']:+.3f} right={command['right_mps']:+.3f} "
-            f"down={command['down_mps']:+.3f} yaw={command['yaw_deg_s']:+.1f} "
+            f"x={command['x_mps']:+.3f} y={command['y_mps']:+.3f} "
+            f"z={command['z_mps']:+.3f} yaw={command['yaw_deg_s']:+.1f} "
             f"anchor={command['has_body_anchor']} fallback={command['using_hmd_fallback']} "
             f"age={command['age_ms']:.0f}ms"
         )
