@@ -248,6 +248,8 @@ class UnityArmCommandReceiver:
             {
                 "frame": "arm_origin_flu_relative",
                 "relative_to": "arm_origin",
+                "control_mode": str(payload.get("control_mode", "twist")),
+                "dof": int(number(payload, "dof", 4 if str(payload.get("control_mode", "")) == "four_dof_twist" else 6)),
                 "vx_mps": clean_zero(clamp(vx, self.args.max_linear_mps)),
                 "vy_mps": clean_zero(clamp(vy, self.args.max_linear_mps)),
                 "vz_mps": clean_zero(clamp(vz, self.args.max_linear_mps)),

@@ -370,6 +370,8 @@ The arm receiver supports relative twist commands:
   "type": "arm_ee_twist_relative",
   "frame": "arm_origin_flu_relative",
   "relative_to": "arm_origin",
+  "control_mode": "four_dof_twist",
+  "dof": 4,
   "valid": true,
   "vx_mps": 0.0,
   "vy_mps": 0.0,
@@ -378,6 +380,34 @@ The arm receiver supports relative twist commands:
   "wy_rad_s": 0.0,
   "wz_rad_s": 0.0
 }
+```
+
+The Unity project's `AdaptiveFlyArmCommandBroadcaster` currently sends this 4-DOF Unity-axis twist by default:
+
+```json
+{
+  "type": "arm_ee_twist_relative",
+  "frame": "arm_origin_unity_relative",
+  "relative_to": "arm_origin",
+  "control_mode": "four_dof_twist",
+  "dof": 4,
+  "valid": true,
+  "vx_unity_mps": 0.0,
+  "vy_unity_mps": 0.0,
+  "vz_unity_mps": 0.0,
+  "wx_unity_rad_s": 0.0,
+  "wy_unity_rad_s": 0.0,
+  "wz_unity_rad_s": 0.0
+}
+```
+
+In that Unity 4-DOF mode, AdaptiveFly body/head commands map as follows:
+
+```text
+body lean forward/back -> vz_unity_mps -> FLU vx_mps
+body lean right/left   -> vx_unity_mps -> FLU vy_mps
+head pitch up/down     -> vy_unity_mps -> FLU vz_mps
+head yaw               -> wy_unity_rad_s -> FLU wz_rad_s
 ```
 
 It also supports relative pose commands:
@@ -398,7 +428,7 @@ It also supports relative pose commands:
 }
 ```
 
-The Unity project can send this relative pose format directly from `AdaptiveFlyArmCommandBroadcaster`:
+The Unity project can also send this relative pose format if `AdaptiveFlyArmCommandBroadcaster.commandMode` is changed back to relative pose:
 
 ```json
 {
