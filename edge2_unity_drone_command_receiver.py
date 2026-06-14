@@ -61,7 +61,7 @@ class UnityCommandReceiver:
 
     def log(self, message):
         timestamp = time.strftime("%H:%M:%S")
-        print(f"{timestamp} [unity-cmd-rx] {message}", flush=True)
+        print(f"{timestamp} [unity-drone-rx] {message}", flush=True)
 
     def run(self):
         self.log(
@@ -116,7 +116,7 @@ class UnityCommandReceiver:
         yaw_frd_deg_s = 0.0 if force_hover else clamp(number(payload, "yaw_deg_s"), self.args.max_yaw_deg_s)
 
         command = {
-            "type": "adaptivefly_control_sanitized",
+            "type": "adaptivefly_drone_control_sanitized",
             "source": f"{address[0]}:{address[1]}",
             "received_time_s": time.time(),
             "age_ms": 0.0,
@@ -168,7 +168,7 @@ class UnityCommandReceiver:
 
     def hover_command(self, reason, age_ms=0.0, address=None, error=None):
         command = {
-            "type": "adaptivefly_control_sanitized",
+            "type": "adaptivefly_drone_control_sanitized",
             "source": f"{address[0]}:{address[1]}" if address else "",
             "received_time_s": time.time(),
             "age_ms": age_ms,

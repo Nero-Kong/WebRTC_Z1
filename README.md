@@ -10,7 +10,8 @@ The Edge2 sender reads the THETA Z1 H.264 UVC stream through `libuvc-theta`, pac
 edge2_theta_z1_webrtc_sender.py      Edge2 WebRTC sender
 edge2_run_theta_z1_webrtc_sender.sh  Edge2 launcher
 edge2_probe_theta_z1.sh              Edge2 camera/GStreamer probe helper
-edge2_unity_command_receiver.py      Edge2 UDP receiver for Unity AdaptiveFly drone commands
+edge2_unity_drone_command_receiver.py Edge2 UDP receiver for Unity AdaptiveFly drone commands
+edge2_unity_arm_command_receiver.py  Edge2 UDP receiver for Unity robotic-arm end-effector commands
 edge2_mavlink_to_z1att.py            Optional MAVLink ATTITUDE to Z1 IMU side-channel helper
 theta_z1_uvc_stdout.c                THETA Z1 H.264 stdout bridge
 thetauvc.c / thetauvc.h              THETA UVC helper code
@@ -62,7 +63,8 @@ Clone this repository on the Edge2:
 cd ~
 git clone https://github.com/Nero-Kong/WebRTC_Z1.git
 cd WebRTC_Z1
-chmod +x edge2_run_theta_z1_webrtc_sender.sh edge2_probe_theta_z1.sh edge2_theta_z1_webrtc_sender.py edge2_mavlink_to_z1att.py
+chmod +x edge2_run_theta_z1_webrtc_sender.sh edge2_probe_theta_z1.sh edge2_theta_z1_webrtc_sender.py
+chmod +x edge2_unity_drone_command_receiver.py edge2_unity_arm_command_receiver.py edge2_mavlink_to_z1att.py
 chmod +x bin/theta_z1_uvc_stdout
 ```
 
@@ -232,7 +234,7 @@ First frame: 1920x960, texture=Texture2D
 
 ## Unity Drone Command Receiver
 
-`edge2_unity_command_receiver.py` listens for AdaptiveFly Unity UDP JSON commands and emits sanitized body-frame velocity setpoints. Unity input uses body FRD fields; the sanitized output is body FLU so downstream PX4/ROS code can consume `x_mps`, `y_mps`, `z_mps`, and `yaw_rad_s` directly. It is intentionally conservative by default: it requires `valid=true`, clamps again on the Edge2, and outputs hover if no packet arrives within 300 ms.
+`edge2_unity_drone_command_receiver.py` listens for AdaptiveFly Unity UDP JSON commands and emits sanitized body-frame velocity setpoints. Unity input uses body FRD fields; the sanitized output is body FLU so downstream PX4/ROS code can consume `x_mps`, `y_mps`, `z_mps`, and `yaw_rad_s` directly. It is intentionally conservative by default: it requires `valid=true`, clamps again on the Edge2, and outputs hover if no packet arrives within 300 ms.
 
 Default receiver settings:
 
@@ -248,19 +250,19 @@ Start it on the Edge2:
 
 ```bash
 cd ~/WebRTC_Z1
-python3 edge2_unity_command_receiver.py
+python3 edge2_unity_drone_command_receiver.py
 ```
 
 For JSON output that another bridge can consume:
 
 ```bash
-python3 edge2_unity_command_receiver.py --print-json
+python3 edge2_unity_drone_command_receiver.py --print-json
 ```
 
 To forward sanitized JSON to another local bridge:
 
 ```bash
-python3 edge2_unity_command_receiver.py --forward-udp 127.0.0.1:14600
+python3 edge2_unity_drone_command_receiver.py --forward-udp 127.0.0.1:14600
 ```
 
 Unity must send to the Edge2 IP, not `127.0.0.1`. In `AdaptiveFlyDroneCommandBroadcaster` set:
@@ -326,6 +328,114 @@ yaw_rad_s
 ```
 
 This script does not arm a vehicle or bypass flight-controller safety. A real MAVLink/ROS bridge should consume the sanitized output, enforce its own deadman/mode checks, and hover on timeout.
+
+## Unity Robotic Arm Command Receiver
+
+`edge2_unity_arm_command_receiver.py` is independent from the drone receiver. It listens for Unity UDP JSON commands for a robotic-arm end effector, sanitizes them, and optionally forwards the sanitized JSON to a local arm bridge. The output frame is `base_flu`: X forward, Y left, Z up.
+
+Default arm receiver settings:
+
+```text
+listen: 0.0.0.0:14561
+timeout: 300 ms
+max linear x/y/z: +/-0.5 m/s
+max position x/y/z: +/-0.5 m
+max angular wx/wy/wz: +/-1.0 rad/s
+output frame: base_flu
+```
+
+Start it on the Edge2:
+
+```bash
+cd ~/WebRTC_Z1
+python3 edge2_unity_arm_command_receiver.py
+```
+
+For JSON output that another arm bridge can consume:
+
+```bash
+python3 edge2_unity_arm_command_receiver.py --print-json
+```
+
+To forward sanitized JSON to a local arm bridge:
+
+```bash
+python3 edge2_unity_arm_command_receiver.py --forward-udp 127.0.0.1:14610
+```
+
+The arm receiver supports twist commands:
+
+```json
+{
+  "type": "arm_ee_twist",
+  "frame": "base_flu",
+  "valid": true,
+  "vx_mps": 0.0,
+  "vy_mps": 0.0,
+  "vz_mps": 0.0,
+  "wx_rad_s": 0.0,
+  "wy_rad_s": 0.0,
+  "wz_rad_s": 0.0
+}
+```
+
+It also supports pose commands:
+
+```json
+{
+  "type": "arm_ee_pose",
+  "frame": "base_flu",
+  "valid": true,
+  "x_m": 0.0,
+  "y_m": 0.0,
+  "z_m": 0.0,
+  "qx": 0.0,
+  "qy": 0.0,
+  "qz": 0.0,
+  "qw": 1.0
+}
+```
+
+If Unity sends Unity-axis fields, the receiver converts them to FLU:
+
+```text
+x_flu =  z_unity
+y_flu = -x_unity
+z_flu =  y_unity
+```
+
+Unity-axis twist fields:
+
+```text
+vx_unity_mps
+vy_unity_mps
+vz_unity_mps
+wx_unity_rad_s
+wy_unity_rad_s
+wz_unity_rad_s
+```
+
+Unity-axis pose fields:
+
+```text
+x_unity_m
+y_unity_m
+z_unity_m
+qx_unity
+qy_unity
+qz_unity
+qw_unity
+```
+
+Sanitized arm output types are:
+
+```text
+unity_arm_ee_twist_sanitized
+unity_arm_ee_pose_sanitized
+unity_arm_ee_hold_sanitized
+```
+
+On `valid=false`, bad JSON, or timeout, the receiver emits `unity_arm_ee_hold_sanitized` with zero twist fields. A real arm bridge should treat this as a deadman hold/current-pose stop, and still enforce joint limits, workspace limits, collision checks, and its own watchdog.
 
 ## Optional MAVLink IMU Side-Channel
 
