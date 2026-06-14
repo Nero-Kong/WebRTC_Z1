@@ -331,7 +331,7 @@ This script does not arm a vehicle or bypass flight-controller safety. A real MA
 
 ## Unity Robotic Arm Command Receiver
 
-`edge2_unity_arm_command_receiver.py` is independent from the drone receiver. It listens for Unity UDP JSON commands for a robotic-arm end effector, sanitizes them, and optionally forwards the sanitized JSON to a local arm bridge. The output frame is `base_flu`: X forward, Y left, Z up.
+`edge2_unity_arm_command_receiver.py` is independent from the drone receiver. It listens for Unity UDP JSON commands for a robotic-arm end effector, sanitizes them, and optionally forwards the sanitized JSON to a local arm bridge. The Unity-side broadcaster sends end-effector targets relative to the arm's own origin. The sanitized output frame is `arm_origin_flu_relative`: X forward, Y left, Z up, with position and pose expressed relative to the arm origin.
 
 Default arm receiver settings:
 
@@ -341,7 +341,7 @@ timeout: 300 ms
 max linear x/y/z: +/-0.5 m/s
 max position x/y/z: +/-0.5 m
 max angular wx/wy/wz: +/-1.0 rad/s
-output frame: base_flu
+output frame: arm_origin_flu_relative
 ```
 
 Start it on the Edge2:
@@ -363,12 +363,13 @@ To forward sanitized JSON to a local arm bridge:
 python3 edge2_unity_arm_command_receiver.py --forward-udp 127.0.0.1:14610
 ```
 
-The arm receiver supports twist commands:
+The arm receiver supports relative twist commands:
 
 ```json
 {
-  "type": "arm_ee_twist",
-  "frame": "base_flu",
+  "type": "arm_ee_twist_relative",
+  "frame": "arm_origin_flu_relative",
+  "relative_to": "arm_origin",
   "valid": true,
   "vx_mps": 0.0,
   "vy_mps": 0.0,
@@ -379,12 +380,13 @@ The arm receiver supports twist commands:
 }
 ```
 
-It also supports pose commands:
+It also supports relative pose commands:
 
 ```json
 {
-  "type": "arm_ee_pose",
-  "frame": "base_flu",
+  "type": "arm_ee_pose_relative",
+  "frame": "arm_origin_flu_relative",
+  "relative_to": "arm_origin",
   "valid": true,
   "x_m": 0.0,
   "y_m": 0.0,
@@ -396,7 +398,25 @@ It also supports pose commands:
 }
 ```
 
-If Unity sends Unity-axis fields, the receiver converts them to FLU:
+The Unity project can send this relative pose format directly from `AdaptiveFlyArmCommandBroadcaster`:
+
+```json
+{
+  "type": "arm_ee_pose_relative",
+  "frame": "arm_origin_unity_relative",
+  "relative_to": "arm_origin",
+  "valid": true,
+  "x_unity_m": 0.0,
+  "y_unity_m": 0.0,
+  "z_unity_m": 0.0,
+  "qx_unity": 0.0,
+  "qy_unity": 0.0,
+  "qz_unity": 0.0,
+  "qw_unity": 1.0
+}
+```
+
+If Unity sends Unity-axis fields, the receiver converts them to relative FLU:
 
 ```text
 x_flu =  z_unity
@@ -430,8 +450,8 @@ qw_unity
 Sanitized arm output types are:
 
 ```text
-unity_arm_ee_twist_sanitized
-unity_arm_ee_pose_sanitized
+unity_arm_ee_twist_relative_sanitized
+unity_arm_ee_pose_relative_sanitized
 unity_arm_ee_hold_sanitized
 ```
 

@@ -155,7 +155,8 @@ class UnityArmCommandReceiver:
             f"timeout={self.args.timeout_ms}ms "
             f"max_linear={self.args.max_linear_mps:.3f}m/s "
             f"max_position={self.args.max_position_m:.3f}m "
-            f"max_angular={self.args.max_angular_rad_s:.3f}rad/s"
+            f"max_angular={self.args.max_angular_rad_s:.3f}rad/s "
+            f"output_frame=arm_origin_flu_relative"
         )
 
         if self.forward_endpoint:
@@ -240,12 +241,13 @@ class UnityArmCommandReceiver:
             wx = number(payload, "wx_rad_s")
             wy = number(payload, "wy_rad_s")
             wz = number(payload, "wz_rad_s", number(payload, "yaw_rad_s"))
-            input_frame = str(payload.get("frame", "base_flu"))
+            input_frame = str(payload.get("frame", "arm_origin_flu_relative"))
 
-        command = self.base_command("unity_arm_ee_twist_sanitized", "twist", payload, address, receive_time, valid)
+        command = self.base_command("unity_arm_ee_twist_relative_sanitized", "twist", payload, address, receive_time, valid)
         command.update(
             {
-                "frame": "base_flu",
+                "frame": "arm_origin_flu_relative",
+                "relative_to": "arm_origin",
                 "vx_mps": clean_zero(clamp(vx, self.args.max_linear_mps)),
                 "vy_mps": clean_zero(clamp(vy, self.args.max_linear_mps)),
                 "vz_mps": clean_zero(clamp(vz, self.args.max_linear_mps)),
@@ -253,6 +255,7 @@ class UnityArmCommandReceiver:
                 "wy_rad_s": clean_zero(clamp(wy, self.args.max_angular_rad_s)),
                 "wz_rad_s": clean_zero(clamp(wz, self.args.max_angular_rad_s)),
                 "input_frame": input_frame,
+                "input_relative_to": str(payload.get("relative_to", "")),
             }
         )
         return command
@@ -282,12 +285,13 @@ class UnityArmCommandReceiver:
                 number(payload, "qz"),
                 number(payload, "qw", 1.0),
             )
-            input_frame = str(payload.get("frame", "base_flu"))
+            input_frame = str(payload.get("frame", "arm_origin_flu_relative"))
 
-        command = self.base_command("unity_arm_ee_pose_sanitized", "pose", payload, address, receive_time, valid)
+        command = self.base_command("unity_arm_ee_pose_relative_sanitized", "pose", payload, address, receive_time, valid)
         command.update(
             {
-                "frame": "base_flu",
+                "frame": "arm_origin_flu_relative",
+                "relative_to": "arm_origin",
                 "x_m": clean_zero(clamp(x, self.args.max_position_m)),
                 "y_m": clean_zero(clamp(y, self.args.max_position_m)),
                 "z_m": clean_zero(clamp(z, self.args.max_position_m)),
@@ -296,6 +300,7 @@ class UnityArmCommandReceiver:
                 "qz": clean_zero(qz),
                 "qw": clean_zero(qw),
                 "input_frame": input_frame,
+                "input_relative_to": str(payload.get("relative_to", "")),
             }
         )
         return command
@@ -347,7 +352,8 @@ class UnityArmCommandReceiver:
             "input_valid": bool(payload.get("valid", False)) if payload else False,
             "state": "hold",
             "reason": reason,
-            "frame": "base_flu",
+            "frame": "arm_origin_flu_relative",
+            "relative_to": "arm_origin",
             "vx_mps": 0.0,
             "vy_mps": 0.0,
             "vz_mps": 0.0,
